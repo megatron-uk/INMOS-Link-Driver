@@ -7,8 +7,10 @@
 *	based on							*
 *		usr/include/linux/lp.h c.1991-1992 James Wiegand	*
 *		many modifications copyright (C) 1992 Michael K. Johnson*
-*									*
-*	Version 0.8, for Linux 1.1.83 and above, January 1995.		*
+*					                                *
+*	Version 0.93, For Linux 3.X.X, November 2014                    *
+*		by John Snowdon john.snowdon@newcastle.ac.uk            *
+*		Changed ioctl call cmd for LINKRESET			*
 *									*
 *	The driver may be copied under the same conditions as the	*
 *	Linux operating system						*
@@ -18,34 +20,33 @@
 #ifndef _LINUX_LINK_H
 #define _LINUX_LINK_H
 
-#include <linux/timer.h>
 
 /*
  * Per POSIX guidelines, this module reserves the LINK and link prefixes
  */
 
-#define LINK_MAJOR			24			/* Major device number */
-#define LINK_NAME			"link"		/* Name of the device to register */
-#define LINK_NO				2			/* Number of supported boards */
+#define LINK_MAJOR		24		/* Major device number */
+#define LINK_NAME		"link"		/* Name of the device to register */
+#define LINK_NO			2		/* Number of supported boards */
 
 /*
  * These are the link_table[].flags flags...
  */
-#define LINK_EXIST	 		0x0001		/* Is a B004-Board with at least one 
+#define LINK_EXIST	 	0x0001		/* Is a B004-Board with at least one 
 										   Transputer present ? */
-#define LINK_BUSY	  		0x0002		/* Is the B004-board in use ? */
+#define LINK_BUSY	  	0x0002		/* Is the B004-board in use ? */
 #define LINK_READ_ABORT		0x0004 		/* abort reading after timeout ? */
 #define LINK_WRITE_ABORT	0x0008 		/* abort writing after timeout ? */
 
 /*
  * IOCTL numbers
  */
-#define LINKTIME			0x0001		/* no longer available */
-#define LINKRESET			0x0002		/* reset transputer */
+#define LINKTIME		0x0001		/* no longer available */
+#define LINKRESET		0x0012		/* reset transputer */
 #define LINKWRITEABLE		0x0004		/* check if we can send a byte */
 #define LINKREADABLE		0x0008		/* check if we can receive a byte */
-#define LINKANALYSE			0x0010		/* go to analyse mode */
-#define LINKERROR			0x0020
+#define LINKANALYSE		0x0010		/* go to analyse mode */
+#define LINKERROR		0x0020
 #define LINKREADTIMEOUT		0x0040		/* set timeout for reading */
 #define LINKWRITETIMEOUT	0x0080		/* set timeout for writing */
 #define LINKREADABORT		0x0100
@@ -75,7 +76,7 @@
 
 #define LINK_MAX_SLEEP		20
 #define LINK_START_SLEEP 	1
-#define LINK_INC			16
+#define LINK_INC		16
 
 /*
  * The addresses of the C012 hardware registers relative to the
@@ -130,26 +131,26 @@ struct link_struct {
 /*
  * Additonal defines for B008-boards
  */
-#define B008_DMA(minor)			link_table[minor].int
-#define B008_INT(minor)			link_table[minor].dma
+#define B008_DMA(minor)		link_table[minor].int
+#define B008_INT(minor)		link_table[minor].dma
 
 /*
  * Number of tries to access isr or osr before reading or writing fails
  */
-#define LINK_MAXTRY 			1000	/* Was 300 */
+#define LINK_MAXTRY 		1000	/* Was 300 */
 
 /*
  * Maximum number of bytes to transfer without calling the scheduler
  */
 
-#define LINK_MAX_BYTES			32
+#define LINK_MAX_BYTES		32
 
 /*
  * bit defines for C012 status ports at base + 2/3
  * accessed with LINK_IS, LINK_OS, which gets the byte...
  */
-#define LINK_READBYTE	1
-#define LINK_WRITEBYTE	1
+#define LINK_READBYTE		1
+#define LINK_WRITEBYTE		1
 
 /*
  * bit defines for C012 reset/error port at base + 16
@@ -161,7 +162,7 @@ struct link_struct {
 /*
  * bit defines for C012 analyse port at base + 17
  */
-#define LINK_ASSERT_ANALYSE		0x01	/* switch transputer to analyse-mode */
+#define LINK_ASSERT_ANALYSE	0x01	/* switch transputer to analyse-mode */
 #define LINK_DEASSERT_ANALYSE	0x00
 
 /*
@@ -170,7 +171,4 @@ struct link_struct {
 extern long link_init(long kmem_start);
 
 #endif
-
-/*************************  EOF *************************/
-
 
