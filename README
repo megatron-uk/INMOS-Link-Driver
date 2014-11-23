@@ -1,0 +1,15 @@
+INMOS-Link-Driver
+=================
+
+Updated INMOS Transputer link driver model for Linux Kernel 3.x.x
+
+This supports the INMOS B004/B008 series of link adaptors to enable the Linux kernel to communicate with the 1980's/1990's INMOS Transputer hardware. 
+
+Should build cleanly with a simple 'make' command, as long as you have Kernel headers and the kbuild package installed.
+
+After install, run a 'mknod /dev/link0 c 24 0' to build the device file.
+
+Build and installs cleaning under Debian 7 (32bit) and Linux kernel 3.2.26, as of November 2014.
+
+Only tested with INMOS B004 compatible hardware so far (Transtech TMB04 motherboard).
+See my other projects (INMOS-ispy and the rest) for updated user-level code to utilise the new Link driver module.
