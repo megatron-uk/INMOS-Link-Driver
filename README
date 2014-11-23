@@ -9,7 +9,7 @@ Should build cleanly with a simple 'make' command, as long as you have Kernel he
 
 After install, run a 'mknod /dev/link0 c 24 0' to build the device file.
 
-Build and installs cleaning under Debian 7 (32bit) and Linux kernel 3.2.26, as of November 2014.
+Build and installs under Debian 7 (32bit) and Linux kernel 3.2.26, as of November 2014.
 
 Only tested with INMOS B004 compatible hardware so far (Transtech TMB04 motherboard).
 See my other projects (INMOS-ispy and the rest) for updated user-level code to utilise the new Link driver module.
