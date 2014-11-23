@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# This is just a simple macro to make my development
+# process easier - ignore it and just use 'make' in
+# normal use.
+make && sudo rmmod link-driver
+sudo insmod link-driver.ko && sudo tail -f /var/log/messages
