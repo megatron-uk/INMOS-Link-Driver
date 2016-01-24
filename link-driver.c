@@ -79,7 +79,7 @@ char kernel_version[] = UTS_RELEASE;
  * Define these symbols if you want to debug the code.
  */
 
-#undef LINK_DEBUG 
+#define LINK_DEBUG 
 #undef LINK_DEBUG_MORE
 
 #define out		outb
@@ -276,7 +276,7 @@ static ssize_t link_read( struct file * file,
 	              char	buffer[LINK_MAX_BYTES];
 	DEB(  unsigned int	link_total_bytes_read = 0; )
 
-	DEB_MORE(printk("LINK(%d) read() set to %d bytes\n", minor, count);)
+	PRINTK("LINK(%d) read() set to %d bytes\n", minor, count);
 
 	if ( count < 0)
 	{
@@ -299,7 +299,7 @@ static ssize_t link_read( struct file * file,
 
 		if (end > LINK_MAX_BYTES) end = LINK_MAX_BYTES;
 
-/**** Main character read from UART ****/
+		/**** Main character read from UART ****/
 
 		timer = jiffies + (100 / (1000 / HZ));
 		sleep_timer = jiffies + (20 / (1000 / HZ));
@@ -311,7 +311,7 @@ static ssize_t link_read( struct file * file,
 			if ( in(LINK_ISR(minor)) & LINK_READBYTE )
 			{
 				c = (char)in(LINK_IDR(minor));
-				PRINTK("LINK(%d) read() data [0x%02x]\n", minor, c);
+				DEB_MORE(PRINTK("LINK(%d) read() data [0x%02x]\n", minor, c);)
 				buffer[l_count] = c;
 
 				DEB(link_total_bytes_read++;)
@@ -329,7 +329,7 @@ static ssize_t link_read( struct file * file,
 				 * take more than a few timer reschedules to read! Stops user space 
 				 * code from hanging indefinitely.
 				 */
-				if (max_sleep > 100)
+				if (max_sleep > 50)
 				{
 					PRINTK("LINK(%d) read() EINTR! reschedule sleep timer exceeded!\n\n", minor);
 					return( -EINTR );
@@ -346,14 +346,14 @@ static ssize_t link_read( struct file * file,
 				if (need_resched())
 				{
 					max_sleep++;
-					/*DEB_MORE(PRINTK("LINK(%d) read() sleep for IO [%d remaining]\n", minor, (100 - max_sleep));)*/
+					DEB_MORE(PRINTK("LINK(%d) read() sleep for IO [%d remaining]\n", minor, (100 - max_sleep));)
 					schedule();
 				}
 				
 			}
 		}
 
-/**** Move received characters to user space ****/
+		/**** Move received characters to user space ****/
 
 		if (l_count)
 		{
@@ -364,7 +364,7 @@ static ssize_t link_read( struct file * file,
 	}
 
 	DEB_MORE(printk("LINK(%d) read() success!\n", minor);)
-	DEB_MORE(printk("LINK(%d) [bytes read: %d]\n\n", minor, l_count);)
+	PRINTK("LINK(%d) [bytes read: %d]\n\n", minor, l_count);
 
 	return( temp - buf );
 
@@ -409,12 +409,14 @@ static ssize_t link_write( struct file * file,
 	               int	l_count = 0;
 	               int	size = count;
 	               int	copy_result;
+	               int	max_sleep;
+	               int	link_notready_times = 0;
 	               int	end;
 	        const char	*cptr = buf;
 	              char	buffer[LINK_MAX_BYTES];
 	DEB(  unsigned int link_total_bytes_written = 0; )
 
-	DEB_MORE(printk("LINK writing %d bytes to link %d.\n", count, minor);)
+	PRINTK("LINK(%d) write() %d bytes\n", minor, count);
 
 	if ( (LINK_F(minor) &= ~LINK_BUSY) == 0)
 	{
@@ -437,40 +439,70 @@ static ssize_t link_write( struct file * file,
 		copy_result = copy_from_user( buffer, cptr, end );
 		cptr += end;
 
-/**** Setup timers and begin to send data out the UART ****/
+		/**** Setup timers and begin to send data out the UART ****/
 
 		timer = jiffies + (100 / (1000 / HZ));
 		sleep_timer = jiffies + (20 / (1000 / HZ));
 
+		max_sleep = 0;
 		while (end)
 		{
 			if (in(LINK_OSR(minor)) & LINK_WRITEBYTE)
 			{
-				PRINTK("LINK(%d) write() data [0x%02x]\n", minor, buffer[l_count]);
+				DEB_MORE(PRINTK("LINK(%d) write() data [0x%02x]\n", minor, buffer[l_count]);)
 				out( buffer[l_count], LINK_ODR(minor) );
 
 				end--;
 				l_count++;
 
+				/* Reset sleep count after a successful write */
+				max_sleep = 0;
 				DEB(link_total_bytes_written++;)
-			}
-
-			if (timer < jiffies)
-			{
-				PRINTK("LINK(%d) write(): Timed out waiting for Tx register\n", minor );
-				return( -EINVAL );
-			}
-
-			if (sleep_timer < jiffies)
-			{
-				sleep_timer = jiffies + (20 / (1000 / HZ));
-
-				if (signal_pending( current ))
+			} else {
+				DEB_MORE(PRINTK("LINK(%d) write() output register not ready!\n", minor);)
+				if (link_notready_times > LINK_MAXTRY)
 				{
-					return( -EINTR );
+					PRINTK("LINK(%d) write() EINVAL! Link not ready!\n", minor );
+					PRINTK("LINK(%d) [bytes remaining: %d | notready wait: %d]\n\n", minor, count, link_notready_times);
+					return( -EINVAL );
 				}
+				link_notready_times++;
 
-				if ( need_resched() ) schedule();
+				if (timer < jiffies)
+				{
+					PRINTK("LINK(%d) write() EINVAL! Timed out waiting for Tx register!\n", minor );
+					PRINTK("LINK(%d) [bytes remaining: %d | notready wait: %d]\n\n", minor, count, link_notready_times);
+					return( -EINVAL );
+				}
+	
+				if (sleep_timer < jiffies)
+				{
+					
+					/* 
+					 * return if rescheduled more than XX times - a single byte shouldn't
+					 * take more than a few timer reschedules to write! Stops user space 
+					 * code from hanging indefinitely.
+					 */
+					if (max_sleep > 50)
+					{
+						PRINTK("LINK(%d) write() EINTR! reschedule sleep timer exceeded!\n", minor);
+						PRINTK("LINK(%d) [bytes remaining: %d | notready wait: %d]\n\n", minor, count, link_notready_times);
+						return( -EINTR );
+					}
+					
+					sleep_timer = jiffies + (20 / (1000 / HZ));
+	
+					if (signal_pending( current ))
+					{
+						return( -EINTR );
+					}
+	
+					if (need_resched()){
+						max_sleep++;
+						DEB_MORE(PRINTK("LINK(%d) write() sleep for IO [%d remaining]\n", minor, (100 - max_sleep));)
+						schedule();
+					}
+				}
 			}
 		}
 
@@ -478,7 +510,7 @@ static ssize_t link_write( struct file * file,
 	}
 
 	DEB_MORE(printk("LINK(%d) write() success!\n", minor);)
-	DEB_MORE(printk("LINK(%d) [bytes remaining: %d | bytes written: %d]\n\n", minor, count, l_count);)
+	PRINTK("LINK(%d) [bytes remaining: %d | notready wait: %d]\n\n", minor, count, link_notready_times);
 	return( size - count );
 } /* link_write() */
 
@@ -649,8 +681,7 @@ long link_init(long kmem_start)
 
 	if ( register_chrdev( LINK_MAJOR, LINK_NAME, &link_fops ) )
 	{
-		printk("link_init: unable to get major %d for link interface.\n",
-			LINK_MAJOR );
+		printk("link_init: unable to get major %d for link interface.\n", LINK_MAJOR );
 		return kmem_start;
 	}
 
@@ -659,8 +690,7 @@ long link_init(long kmem_start)
 	   the LINK. So let's do a reset and then test the output status
 	   register
 	*/
-	for (test = 0; link_base_addresses[test] &&
-					link_devices < LINK_NO; test++)
+	for (test = 0; link_base_addresses[test] && link_devices < LINK_NO; test++)
 	{
 		link_delay();
 		LINK_BASE((int) link_devices) = link_base_addresses[test];
@@ -680,12 +710,8 @@ long link_init(long kmem_start)
 					LINK_BOARDTYPE((int) link_devices) = LINK_B008;
 				else
 					LINK_BOARDTYPE((int) link_devices) = LINK_B004;
-				printk("link%d at 0x0%x (polling) is a B00%s\n",
-					link_devices,LINK_IDR((int) link_devices),
-					LINK_BOARDTYPE((int) link_devices) == LINK_B004 ? "4" : "8");
-				request_region(LINK_IDR((int) link_devices), 
-					LINK_BOARDTYPE((int) link_devices) == LINK_B004 ? B004_IO_SIZE : B008_IO_SIZE,
-					LINK_NAME);
+				printk("link%d at 0x0%x (polling) is a B00%s\n", link_devices,LINK_IDR((int) link_devices), LINK_BOARDTYPE((int) link_devices) == LINK_B004 ? "4" : "8");
+				request_region(LINK_IDR((int) link_devices), B008_IO_SIZE, LINK_NAME);
 				link_devices++;
 				break;
 			}
@@ -709,5 +735,5 @@ void cleanup_module(void)
 	int i;
 	unregister_chrdev( LINK_MAJOR, LINK_NAME );
 	for (i = 0; i < link_devices; i++)
-		release_region(LINK_IDR(i), LINK_BOARDTYPE(i) == LINK_B004 ? B004_IO_SIZE : B008_IO_SIZE);
+		release_region(LINK_IDR(i), B008_IO_SIZE);
 }

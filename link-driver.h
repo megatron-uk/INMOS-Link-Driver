@@ -92,7 +92,7 @@
 #define LINK_ANALYSE_OFFSET	17		/* Analyse Register */
 #define B008_DMA_OFFSET		18		/* B008: DMA request register */
 #define B008_INT_OFFSET		19		/* B008: Interrupt control reg */
-#define B004_IO_SIZE		18
+#define B004_IO_SIZE		20		/* Some 'non' B008 boards have additional registers, allocate the space anyway! */
 #define B008_IO_SIZE		20
 
 struct link_struct {

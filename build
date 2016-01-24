@@ -3,5 +3,17 @@
 # This is just a simple macro to make my development
 # process easier - ignore it and just use 'make' in
 # normal use.
+echo "Creating devices."
+if [ ! -c /dev/link0 ] ; then
+	sudo mknod /dev/link0 c 24 0;
+fi
+if [ ! -c /dev/link1 ] ; then
+	sudo mknod /dev/link1 c 24 1;
+fi
+if [ ! -c /dev/link2 ] ; then
+	sudo mknod /dev/link2 c 24 2;
+fi
+sudo chmod a+rw /dev/link?
+
 make && sudo rmmod link-driver
 sudo insmod link-driver.ko && sudo tail -f /var/log/messages
